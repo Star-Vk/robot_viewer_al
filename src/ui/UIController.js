@@ -285,6 +285,7 @@ export class UIController {
         const panelButtonMap = {
             'floating-files-panel': 'toggle-files-panel',
             'floating-joints-panel': 'toggle-joints-panel',
+            'floating-actions-panel': 'toggle-actions-panel',
             'floating-model-tree': 'toggle-model-tree',
             'floating-help-panel': 'help-button'
         };
@@ -532,4 +533,3 @@ export class UIController {
         return this.angleUnit;
     }
 }
-

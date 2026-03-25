@@ -1,0 +1,23 @@
+{
+  "name": "default",
+  "version": 1,
+  "description": "Default action-to-joint mapping used by the Actions panel.",
+  "mappings": {
+    "can2:3": "lw_shoulder_pitch",
+    "can2:4": "lw_arm_roll",
+    "can2:5": "lw_arm_yaw",
+    "can2:6": "lw_elbow_pitch",
+    "can3:13": "rw_shoulder_pitch",
+    "can3:14": "rw_arm_roll",
+    "can3:15": "rw_arm_yaw",
+    "can3:16": "rw_elbow_pitch",
+    "can1:3": "lw_shoulder_pitch",
+    "can1:4": "lw_arm_roll",
+    "can1:5": "lw_arm_yaw",
+    "can1:6": "lw_elbow_pitch",
+    "can1:13": "rw_shoulder_pitch",
+    "can1:14": "rw_arm_roll",
+    "can1:15": "rw_arm_yaw",
+    "can1:16": "rw_elbow_pitch"
+  }
+}

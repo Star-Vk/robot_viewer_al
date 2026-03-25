@@ -22,6 +22,70 @@ export class JointControlsUI {
     }
 
     /**
+     * Sync slider/input display for a joint without triggering DOM events.
+     */
+    syncJointDisplay(jointName, value) {
+        const slider = document.querySelector(`input[data-joint="${jointName}"]`);
+        if (slider) {
+            slider.value = value;
+        }
+
+        const valueInput = document.querySelector(`input[data-joint-input="${jointName}"]`);
+        if (valueInput) {
+            valueInput.value = this.angleUnit === 'deg'
+                ? (value * 180 / Math.PI).toFixed(2)
+                : value.toFixed(2);
+        }
+    }
+
+    /**
+     * Apply a batch of joint values and refresh the scene once.
+     */
+    applyJointValues(model, jointValues, options = {}) {
+        if (!model || !jointValues) {
+            return;
+        }
+
+        const {
+            ignoreLimits = this.sceneManager?.ignoreLimits || false,
+            applyConstraints = true,
+            renderImmediate = false,
+            updateMeasurements = true
+        } = options;
+
+        let hasUpdates = false;
+
+        Object.entries(jointValues).forEach(([jointName, value]) => {
+            const joint = model.joints?.get(jointName);
+            if (!joint) {
+                return;
+            }
+
+            ModelLoaderFactory.setJointAngle(model, jointName, value, ignoreLimits);
+            joint.currentValue = value;
+            this.syncJointDisplay(jointName, value);
+            hasUpdates = true;
+        });
+
+        if (!hasUpdates) {
+            return;
+        }
+
+        if (applyConstraints && this.sceneManager?.constraintManager) {
+            this.sceneManager.constraintManager.applyConstraints(model, null);
+        }
+
+        this.sceneManager?.redraw();
+        if (renderImmediate) {
+            this.sceneManager?.render();
+        }
+
+        if (updateMeasurements && this.sceneManager?.onMeasurementUpdate) {
+            this.sceneManager.onMeasurementUpdate();
+        }
+    }
+
+    /**
      * Update XML content in editor (URDF format only)
      */
     updateEditorXML(jointName, limits) {

@@ -236,6 +236,28 @@
             flex-direction: column;
         }
 
+        /* Action library floating panel */
+        #floating-actions-panel {
+            top: 80px;
+            right: 20px;
+            width: 360px;
+            height: 430px;
+            transition: all 0.4s var(--spring);
+            display: none;
+            flex-direction: column;
+        }
+
+        #floating-actions-panel.maximized {
+            height: calc(100vh - 100px) !important;
+            width: 420px !important;
+        }
+
+        #floating-actions-panel .floating-panel-content {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
         .floating-panel-content {
             flex: 1;
             overflow-y: auto;
@@ -825,6 +847,194 @@
 
         .control-button.active:active {
             transform: scale(0.98);
+        }
+
+        .actions-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .actions-toolbar .control-button {
+            flex: 1;
+        }
+
+        .action-speed-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .action-speed-group select {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: var(--text-primary);
+            padding: 5px 8px;
+            font-size: 11px;
+        }
+
+        [data-theme="light"] .action-speed-group select {
+            background: rgba(0, 0, 0, 0.03);
+            border-color: rgba(0, 0, 0, 0.08);
+        }
+
+        .action-mapping {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        [data-theme="light"] .action-mapping {
+            background: rgba(0, 0, 0, 0.02);
+            border-color: rgba(0, 0, 0, 0.08);
+        }
+
+        .action-mapping-toolbar {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-mapping-toolbar .control-button {
+            flex: 1;
+        }
+
+        .action-mapping-description {
+            margin-top: 4px;
+            font-size: 11px;
+            color: var(--text-tertiary);
+            line-height: 1.45;
+        }
+
+        .actions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-height: 120px;
+        }
+
+        .action-item {
+            width: 100%;
+            text-align: left;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            color: var(--text-primary);
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: all 0.2s var(--spring);
+        }
+
+        .action-item:hover {
+            background: rgba(255, 255, 255, 0.09);
+            transform: translateY(-1px);
+        }
+
+        .action-item.active {
+            border-color: rgba(10, 132, 255, 0.5);
+            background: rgba(10, 132, 255, 0.12);
+            box-shadow: 0 0 0 1px rgba(10, 132, 255, 0.2);
+        }
+
+        [data-theme="light"] .action-item {
+            background: rgba(0, 0, 0, 0.02);
+            border-color: rgba(0, 0, 0, 0.08);
+        }
+
+        [data-theme="light"] .action-item:hover {
+            background: rgba(0, 0, 0, 0.04);
+        }
+
+        .action-item-title {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .action-item-meta,
+        .action-item-warning,
+        .action-summary-row,
+        .action-time-row,
+        .action-status {
+            font-size: 11px;
+            color: var(--text-secondary);
+            line-height: 1.45;
+        }
+
+        .action-item-warning {
+            margin-top: 4px;
+            color: #ffb86b;
+        }
+
+        .action-summary {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            padding: 10px 12px;
+        }
+
+        [data-theme="light"] .action-summary {
+            background: rgba(0, 0, 0, 0.02);
+            border-color: rgba(0, 0, 0, 0.08);
+        }
+
+        .action-player {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        [data-theme="light"] .action-player {
+            background: rgba(0, 0, 0, 0.02);
+            border-color: rgba(0, 0, 0, 0.08);
+        }
+
+        .action-transport {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-transport .control-button {
+            flex: 1;
+        }
+
+        .action-timeline-row {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .action-timeline-row input[type="range"] {
+            width: 100%;
+        }
+
+        .action-time-row {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .action-status {
+            min-height: 18px;
+        }
+
+        .action-status.warn {
+            color: #ffb86b;
+        }
+
+        .action-status.error {
+            color: #ff6b6b;
         }
 
         #unit-toggle {
@@ -2952,6 +3162,9 @@
                     <button class="tool-button active" id="toggle-joints-panel">
                         <span class="tool-button-text" data-i18n="joints"></span>
                     </button>
+                    <button class="tool-button" id="toggle-actions-panel">
+                        <span class="tool-button-text" data-i18n="actions"></span>
+                    </button>
                     <button class="tool-button" id="toggle-model-tree">
                         <span class="tool-button-text" data-i18n="structure"></span>
                     </button>
@@ -3017,6 +3230,82 @@
                 </div>
                 <div class="floating-panel-content" id="joint-controls">
                     <div class="empty-state" data-i18n="noModel"></div>
+                </div>
+            </div>
+
+            <div id="floating-actions-panel" class="floating-panel">
+                <div class="floating-panel-header">
+                    <span data-i18n="actionLibrary"></span>
+                    <button class="panel-maximize-btn" data-panel-id="floating-actions-panel">⛶</button>
+                    <button class="panel-close-btn" data-panel="floating-actions-panel">✕</button>
+                </div>
+                <div class="floating-panel-content">
+                    <div class="actions-toolbar">
+                        <button class="control-button" id="import-actions-btn">
+                            <span data-i18n="importActions"></span>
+                        </button>
+                        <div class="action-speed-group">
+                            <span data-i18n="speed"></span>
+                            <select id="action-speed-select">
+                                <option value="0.25">0.25x</option>
+                                <option value="0.5">0.5x</option>
+                                <option value="1" selected>1x</option>
+                                <option value="1.5">1.5x</option>
+                                <option value="2">2x</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <input id="actions-file-input" type="file" accept=".csv,text/csv" multiple hidden>
+                    <input id="mapping-file-input" type="file" accept=".json,application/json" hidden>
+
+                    <div class="action-mapping">
+                        <div class="panel-title" data-i18n="mapping"></div>
+                        <div id="action-mapping-info" class="action-summary">
+                            <div class="empty-state" data-i18n="mappingLoading"></div>
+                        </div>
+                        <div class="action-mapping-toolbar">
+                            <button class="control-button" id="import-mapping-btn">
+                                <span data-i18n="mappingImport"></span>
+                            </button>
+                            <button class="control-button" id="reset-mapping-btn">
+                                <span data-i18n="mappingReset"></span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="actions-list" class="actions-list">
+                        <div class="empty-state" data-i18n="noActionsLoaded"></div>
+                    </div>
+
+                    <div id="action-summary" class="action-summary">
+                        <div class="empty-state" data-i18n="actionSelectPrompt"></div>
+                    </div>
+
+                    <div class="action-player">
+                        <div class="action-transport">
+                            <button class="control-button" id="action-play-btn">
+                                <span data-i18n="play"></span>
+                            </button>
+                            <button class="control-button" id="action-pause-btn">
+                                <span data-i18n="pause"></span>
+                            </button>
+                            <button class="control-button" id="action-stop-btn">
+                                <span data-i18n="stop"></span>
+                            </button>
+                        </div>
+
+                        <div class="action-timeline-row">
+                            <div class="panel-title" data-i18n="timeline"></div>
+                            <input id="action-timeline" type="range" min="0" max="1000" value="0">
+                            <div class="action-time-row">
+                                <span id="action-current-time">0.00s</span>
+                                <span id="action-total-time">0.00s</span>
+                            </div>
+                        </div>
+
+                        <div id="action-status" class="action-status"></div>
+                    </div>
                 </div>
             </div>
 

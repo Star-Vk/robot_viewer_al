@@ -15,6 +15,8 @@ import { CodeEditorManager } from './controllers/CodeEditorManager.js';
 import { MeasurementController } from './controllers/MeasurementController.js';
 import { USDViewerManager } from './renderer/USDViewerManager.js';
 import { MujocoSimulationManager } from './renderer/MujocoSimulationManager.js';
+import { ActionPlaybackController } from './controllers/ActionPlaybackController.js';
+import { ActionPanel } from './ui/ActionPanel.js';
 import { i18n } from './utils/i18n.js';
 
 // Expose d3 globally for PanelManager
@@ -37,6 +39,8 @@ class App {
         this.measurementController = null;
         this.usdViewerManager = null;
         this.mujocoSimulationManager = null;
+        this.actionPlaybackController = null;
+        this.actionPanel = null;
         this.currentModel = null;
         this.currentMJCFFile = null;
         this.currentMJCFModel = null;
@@ -177,6 +181,58 @@ class App {
                 onMujocoReset: () => this.handleMujocoReset(),
                 onMujocoToggleSimulate: () => this.handleMujocoToggleSimulate()
             });
+
+            // Initialize action panel and playback controller
+            this.actionPanel = new ActionPanel();
+            this.actionPanel.init();
+
+            this.actionPlaybackController = new ActionPlaybackController(
+                this.sceneManager,
+                this.jointControlsUI
+            );
+
+            this.actionPanel.onImportRequested = async (files) => {
+                await this.actionPlaybackController.importActionFiles(files);
+            };
+            this.actionPanel.onImportMappingRequested = async (file) => {
+                await this.actionPlaybackController.importMappingFile(file);
+            };
+            this.actionPanel.onResetMappingRequested = async () => {
+                await this.actionPlaybackController.resetMappingToDefault();
+            };
+            this.actionPanel.onActionSelected = (actionId) => {
+                this.actionPlaybackController.selectAction(actionId);
+            };
+            this.actionPanel.onPlayRequested = () => {
+                this.actionPlaybackController.play();
+            };
+            this.actionPanel.onPauseRequested = () => {
+                this.actionPlaybackController.pause();
+            };
+            this.actionPanel.onStopRequested = () => {
+                this.actionPlaybackController.stop();
+            };
+            this.actionPanel.onTimelineChanged = (progress) => {
+                this.actionPlaybackController.seekNormalized(progress);
+            };
+            this.actionPanel.onPlaybackRateChanged = (rate) => {
+                this.actionPlaybackController.setPlaybackRate(rate);
+            };
+
+            this.actionPlaybackController.onActionsChanged = (actions, selectedActionId) => {
+                this.actionPanel.setActions(actions, selectedActionId);
+            };
+            this.actionPlaybackController.onPlaybackStateChanged = (state) => {
+                this.actionPanel.updatePlaybackState(state);
+            };
+            this.actionPlaybackController.onStatusChanged = (status) => {
+                this.actionPanel.setStatus(status);
+            };
+            this.actionPlaybackController.onMappingChanged = (mappingSummary) => {
+                this.actionPanel.setMappingSummary(mappingSummary);
+            };
+
+            await this.actionPlaybackController.initialize();
 
             // Set measurement update callback
             this.sceneManager.onMeasurementUpdate = () => {
@@ -345,6 +401,8 @@ class App {
 
         // Check if USD WASM model
         if (model?.userData?.isUSDWASM) {
+            this.actionPlaybackController?.setModel(null);
+
             // Hide Three.js canvas, show USD viewer
             const canvas = document.getElementById('canvas');
             const usdContainer = document.getElementById('usd-viewer-container');
@@ -491,6 +549,7 @@ class App {
             // Normal model
             this.sceneManager.setGroundVisible(true);
             this.jointControlsUI.setupJointControls(model);
+            this.actionPlaybackController?.setModel(model);
 
             // Draw model graph
             if (this.modelGraphView) {
@@ -509,6 +568,7 @@ class App {
         } else {
             // Mesh file
             this.sceneManager.setGroundVisible(false);
+            this.actionPlaybackController?.setModel(null);
 
             // Clear and hide graph
             if (this.modelGraphView) {
@@ -879,6 +939,10 @@ class App {
         // Update code editor save status text
         if (this.codeEditorManager) {
             this.codeEditorManager.updateEditorSaveStatus();
+        }
+
+        if (this.actionPanel) {
+            this.actionPanel.refreshText();
         }
 
         // Update joint controls panel (if model exists)
