@@ -166,7 +166,7 @@ public/config/action-joint-mapping.json
 - `can2:3`
 - `can3:16`
 - `can1:5`
-
+tips:can2:3 表示 can2 总线上的电机 ID 为 3 的关节
 值必须是当前模型里真实存在的关节名，例如：
 
 - `lw_shoulder_pitch`
