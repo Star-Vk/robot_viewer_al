@@ -256,6 +256,12 @@
             display: flex;
             flex-direction: column;
             gap: 12px;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .action-panel-content > * {
+            flex-shrink: 0;
         }
 
         .floating-panel-content {
@@ -853,20 +859,32 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 8px;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         .actions-toolbar .control-button {
-            flex: 1;
+            flex: 1 1 160px;
+            min-width: 0;
         }
 
         .action-speed-group {
             display: flex;
             align-items: center;
+            justify-content: flex-end;
             gap: 8px;
+            padding: 6px 10px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
             font-size: 11px;
             color: var(--text-secondary);
             white-space: nowrap;
+        }
+
+        [data-theme="light"] .action-speed-group {
+            background: rgba(0, 0, 0, 0.02);
+            border-color: rgba(0, 0, 0, 0.08);
         }
 
         .action-speed-group select {
@@ -899,12 +917,13 @@
         }
 
         .action-mapping-toolbar {
-            display: flex;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 8px;
         }
 
         .action-mapping-toolbar .control-button {
-            flex: 1;
+            min-width: 0;
         }
 
         .action-mapping-description {
@@ -918,7 +937,44 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            scrollbar-gutter: stable;
+            padding: 2px 6px 2px 2px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .actions-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .actions-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .actions-list::-webkit-scrollbar-thumb {
+            background: rgba(128, 128, 128, 0.32);
+            border-radius: 999px;
+        }
+
+        .actions-list::-webkit-scrollbar-thumb:hover {
+            background: rgba(128, 128, 128, 0.5);
+        }
+
+        [data-theme="light"] .actions-list {
+            background: rgba(0, 0, 0, 0.02);
+            border-color: rgba(0, 0, 0, 0.08);
+        }
+
+        .actions-list .empty-state {
             min-height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .action-item {
@@ -931,6 +987,7 @@
             padding: 10px 12px;
             cursor: pointer;
             transition: all 0.2s var(--spring);
+            flex-shrink: 0;
         }
 
         .action-item:hover {
@@ -957,6 +1014,7 @@
             font-size: 13px;
             font-weight: 600;
             margin-bottom: 4px;
+            overflow-wrap: anywhere;
         }
 
         .action-item-meta,
@@ -972,6 +1030,7 @@
         .action-item-warning {
             margin-top: 4px;
             color: #ffb86b;
+            overflow-wrap: anywhere;
         }
 
         .action-summary {
@@ -979,6 +1038,8 @@
             border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 14px;
             padding: 10px 12px;
+            display: grid;
+            gap: 6px;
         }
 
         [data-theme="light"] .action-summary {
@@ -993,21 +1054,24 @@
             padding: 10px 12px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
         }
 
         [data-theme="light"] .action-player {
             background: rgba(0, 0, 0, 0.02);
             border-color: rgba(0, 0, 0, 0.08);
+            box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.03);
         }
 
         .action-transport {
-            display: flex;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 8px;
         }
 
         .action-transport .control-button {
-            flex: 1;
+            min-width: 0;
         }
 
         .action-timeline-row {
@@ -1027,6 +1091,8 @@
 
         .action-status {
             min-height: 18px;
+            padding-top: 4px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
         }
 
         .action-status.warn {
@@ -1035,6 +1101,10 @@
 
         .action-status.error {
             color: #ff6b6b;
+        }
+
+        [data-theme="light"] .action-status {
+            border-top-color: rgba(0, 0, 0, 0.08);
         }
 
         #unit-toggle {
@@ -3239,7 +3309,7 @@
                     <button class="panel-maximize-btn" data-panel-id="floating-actions-panel">⛶</button>
                     <button class="panel-close-btn" data-panel="floating-actions-panel">✕</button>
                 </div>
-                <div class="floating-panel-content">
+                <div class="floating-panel-content action-panel-content">
                     <div class="actions-toolbar">
                         <button class="control-button" id="import-actions-btn">
                             <span data-i18n="importActions"></span>
