@@ -7,11 +7,82 @@ import {
     stringifyJointStateMappingConfig
 } from '../utils/jointMappingUtils.js';
 
+export const SIM_BACKENDS = {
+    TARGET_JOINT_STATE: 'target_joint_state',
+    FAKE_FORWARD_POSITION_CONTROLLER: 'fake_forward_position_controller'
+};
+
+const OPENARM_LEFT_URDF_JOINTS = [
+    'openarm_left_joint1',
+    'openarm_left_joint2',
+    'openarm_left_joint3',
+    'openarm_left_joint4',
+    'openarm_left_joint5',
+    'openarm_left_joint6',
+    'openarm_left_joint7'
+];
+
+const OPENARM_RIGHT_URDF_JOINTS = [
+    'openarm_right_joint1',
+    'openarm_right_joint2',
+    'openarm_right_joint3',
+    'openarm_right_joint4',
+    'openarm_right_joint5',
+    'openarm_right_joint6',
+    'openarm_right_joint7'
+];
+
+const OPENARMX_LEFT_ROS_JOINTS = [
+    'openarmx_left_joint1',
+    'openarmx_left_joint2',
+    'openarmx_left_joint3',
+    'openarmx_left_joint4',
+    'openarmx_left_joint5',
+    'openarmx_left_joint6',
+    'openarmx_left_joint7'
+];
+
+const OPENARMX_RIGHT_ROS_JOINTS = [
+    'openarmx_right_joint1',
+    'openarmx_right_joint2',
+    'openarmx_right_joint3',
+    'openarmx_right_joint4',
+    'openarmx_right_joint5',
+    'openarmx_right_joint6',
+    'openarmx_right_joint7'
+];
+
+export const DEFAULT_OPENARMX_JOINT_STATE_MAPPING_CONFIG = {
+    name: 'openarmx-fake-controller-default',
+    version: 1,
+    source: 'joint_state',
+    mappings: {
+        openarmx_left_joint1: 'openarm_left_joint1',
+        openarmx_left_joint2: 'openarm_left_joint2',
+        openarmx_left_joint3: 'openarm_left_joint3',
+        openarmx_left_joint4: 'openarm_left_joint4',
+        openarmx_left_joint5: 'openarm_left_joint5',
+        openarmx_left_joint6: 'openarm_left_joint6',
+        openarmx_left_joint7: 'openarm_left_joint7',
+        openarmx_right_joint1: 'openarm_right_joint1',
+        openarmx_right_joint2: 'openarm_right_joint2',
+        openarmx_right_joint3: 'openarm_right_joint3',
+        openarmx_right_joint4: 'openarm_right_joint4',
+        openarmx_right_joint5: 'openarm_right_joint5',
+        openarmx_right_joint6: 'openarm_right_joint6',
+        openarmx_right_joint7: 'openarm_right_joint7'
+    }
+};
+
 export const DEFAULT_SIM_STREAM_CONFIG = {
+    backend: SIM_BACKENDS.FAKE_FORWARD_POSITION_CONTROLLER,
     rosbridgeUrl: 'ws://localhost:9090',
     targetJointTopic: '/openarm/target_joint_states',
     simJointTopic: '/openarm/sim/joint_states',
     currentJointTopic: '/openarm/current_joint_states',
+    jointStatesTopic: '/joint_states',
+    leftControllerCommandTopic: '/left_forward_position_controller/commands',
+    rightControllerCommandTopic: '/right_forward_position_controller/commands',
     simulationHz: 30
 };
 
@@ -21,7 +92,9 @@ export const DEFAULT_LIVE_STREAM_CONFIG = {
 };
 
 const STREAM_MODES = new Set(['sim', 'live']);
-const INPUT_SUBSCRIPTION_KEY = 'openarm-joint-state-stream-input';
+const TARGET_SUBSCRIPTION_KEY = 'openarm-target-joint-state-input';
+const LEFT_COMMAND_SUBSCRIPTION_KEY = 'openarm-left-forward-position-command';
+const RIGHT_COMMAND_SUBSCRIPTION_KEY = 'openarm-right-forward-position-command';
 
 function cloneConfig(config) {
     return JSON.parse(JSON.stringify(config));
@@ -40,12 +113,52 @@ function normalizeHz(value, fallback = 30) {
     return Math.max(1, Math.min(120, hz));
 }
 
+function normalizeSimBackend(value, fallback = SIM_BACKENDS.FAKE_FORWARD_POSITION_CONTROLLER) {
+    return Object.values(SIM_BACKENDS).includes(value) ? value : fallback;
+}
+
 function getRosTimeNow() {
     const nowMs = Date.now();
     return {
         sec: Math.floor(nowMs / 1000),
         nanosec: (nowMs % 1000) * 1000000
     };
+}
+
+function getDefaultRosJointName(side, index) {
+    return side === 'left'
+        ? OPENARMX_LEFT_ROS_JOINTS[index]
+        : OPENARMX_RIGHT_ROS_JOINTS[index];
+}
+
+function getDefaultUrdfJointName(side, index) {
+    return side === 'left'
+        ? OPENARM_LEFT_URDF_JOINTS[index]
+        : OPENARM_RIGHT_URDF_JOINTS[index];
+}
+
+function parseMappingValue(sourceJoint, mappingValue) {
+    if (typeof mappingValue === 'string') {
+        return {
+            rosJoint: sourceJoint,
+            urdfJoint: mappingValue,
+            sign: 1,
+            scale: 1,
+            offset: 0
+        };
+    }
+
+    if (mappingValue && typeof mappingValue === 'object') {
+        return {
+            rosJoint: sourceJoint,
+            urdfJoint: mappingValue.urdf_joint,
+            sign: Number(mappingValue.sign) >= 0 ? 1 : -1,
+            scale: Number.isFinite(Number(mappingValue.scale)) ? Number(mappingValue.scale) : 1,
+            offset: Number.isFinite(Number(mappingValue.offset)) ? Number(mappingValue.offset) : 0
+        };
+    }
+
+    return null;
 }
 
 export class JointStateStreamController {
@@ -66,7 +179,10 @@ export class JointStateStreamController {
         };
 
         this.mappingConfigs = {
-            sim: cloneJointStateMappingConfig(DEFAULT_JOINT_STATE_MAPPING_CONFIG),
+            sim: {
+                [SIM_BACKENDS.TARGET_JOINT_STATE]: cloneJointStateMappingConfig(DEFAULT_JOINT_STATE_MAPPING_CONFIG),
+                [SIM_BACKENDS.FAKE_FORWARD_POSITION_CONTROLLER]: cloneJointStateMappingConfig(DEFAULT_OPENARMX_JOINT_STATE_MAPPING_CONFIG)
+            },
             live: cloneJointStateMappingConfig(DEFAULT_JOINT_STATE_MAPPING_CONFIG)
         };
 
@@ -119,6 +235,7 @@ export class JointStateStreamController {
 
         if (nextMode === 'sim') {
             this.syncVirtualStateFromModel();
+            this.ensureFakeControllerVirtualJoints();
         }
 
         this.emitChange();
@@ -163,6 +280,7 @@ export class JointStateStreamController {
         const state = this.readCurrentJointStateMap();
         this.initialJointState = new Map(state);
         this.virtualJointState = new Map(state);
+        this.ensureFakeControllerVirtualJoints();
     }
 
     syncVirtualStateFromModel() {
@@ -172,6 +290,19 @@ export class JointStateStreamController {
         }
 
         this.virtualJointState = this.readCurrentJointStateMap();
+        this.ensureFakeControllerVirtualJoints();
+    }
+
+    ensureFakeControllerVirtualJoints() {
+        this.getFakeControllerMappingEntries().forEach(({ urdfJoint }) => {
+            if (!urdfJoint || this.virtualJointState.has(urdfJoint)) {
+                return;
+            }
+
+            const joint = this.currentModel?.joints?.get(urdfJoint);
+            const value = Number(joint?.currentValue);
+            this.virtualJointState.set(urdfJoint, Number.isFinite(value) ? value : 0);
+        });
     }
 
     updateConfig(mode, partialConfig = {}) {
@@ -180,14 +311,26 @@ export class JointStateStreamController {
         }
 
         if (mode === 'sim') {
+            const previousBackend = this.configs.sim.backend;
+            const nextBackend = normalizeSimBackend(partialConfig.backend, previousBackend);
+
             this.configs.sim = {
                 ...this.configs.sim,
+                backend: nextBackend,
                 rosbridgeUrl: normalizeTopic(partialConfig.rosbridgeUrl, this.configs.sim.rosbridgeUrl),
                 targetJointTopic: normalizeTopic(partialConfig.targetJointTopic, this.configs.sim.targetJointTopic),
                 simJointTopic: normalizeTopic(partialConfig.simJointTopic, this.configs.sim.simJointTopic),
                 currentJointTopic: normalizeTopic(partialConfig.currentJointTopic, this.configs.sim.currentJointTopic),
+                jointStatesTopic: normalizeTopic(partialConfig.jointStatesTopic, this.configs.sim.jointStatesTopic),
+                leftControllerCommandTopic: normalizeTopic(partialConfig.leftControllerCommandTopic, this.configs.sim.leftControllerCommandTopic),
+                rightControllerCommandTopic: normalizeTopic(partialConfig.rightControllerCommandTopic, this.configs.sim.rightControllerCommandTopic),
                 simulationHz: normalizeHz(partialConfig.simulationHz, this.configs.sim.simulationHz)
             };
+
+            if (previousBackend !== nextBackend) {
+                this.stats = this.createEmptyStats();
+                this.ensureFakeControllerVirtualJoints();
+            }
         } else {
             this.configs.live = {
                 ...this.configs.live,
@@ -206,12 +349,30 @@ export class JointStateStreamController {
         this.emitChange();
     }
 
+    getActiveSimBackend() {
+        return normalizeSimBackend(this.configs.sim.backend);
+    }
+
+    getMappingConfig(mode) {
+        if (mode === 'sim') {
+            return this.mappingConfigs.sim[this.getActiveSimBackend()] || DEFAULT_JOINT_STATE_MAPPING_CONFIG;
+        }
+
+        return this.mappingConfigs[mode] || DEFAULT_JOINT_STATE_MAPPING_CONFIG;
+    }
+
     setMappingFromText(mode, text) {
         if (!STREAM_MODES.has(mode)) {
             return;
         }
 
-        this.mappingConfigs[mode] = parseJointStateMappingText(text);
+        if (mode === 'sim') {
+            this.mappingConfigs.sim[this.getActiveSimBackend()] = parseJointStateMappingText(text);
+            this.ensureFakeControllerVirtualJoints();
+        } else {
+            this.mappingConfigs[mode] = parseJointStateMappingText(text);
+        }
+
         this.emitChange();
     }
 
@@ -220,12 +381,21 @@ export class JointStateStreamController {
             return;
         }
 
-        this.mappingConfigs[mode] = normalizeJointStateMappingConfig(DEFAULT_JOINT_STATE_MAPPING_CONFIG);
+        if (mode === 'sim') {
+            const backend = this.getActiveSimBackend();
+            this.mappingConfigs.sim[backend] = backend === SIM_BACKENDS.FAKE_FORWARD_POSITION_CONTROLLER
+                ? normalizeJointStateMappingConfig(DEFAULT_OPENARMX_JOINT_STATE_MAPPING_CONFIG)
+                : normalizeJointStateMappingConfig(DEFAULT_JOINT_STATE_MAPPING_CONFIG);
+            this.ensureFakeControllerVirtualJoints();
+        } else {
+            this.mappingConfigs[mode] = normalizeJointStateMappingConfig(DEFAULT_JOINT_STATE_MAPPING_CONFIG);
+        }
+
         this.emitChange();
     }
 
     getMappingText(mode) {
-        return stringifyJointStateMappingConfig(this.mappingConfigs[mode] || DEFAULT_JOINT_STATE_MAPPING_CONFIG);
+        return stringifyJointStateMappingConfig(this.getMappingConfig(mode));
     }
 
     async connect(url) {
@@ -261,12 +431,15 @@ export class JointStateStreamController {
             return false;
         }
 
-        if (mode === 'sim' && this.virtualJointState.size === 0) {
-            this.syncVirtualStateFromModel();
+        if (mode === 'sim') {
+            if (this.virtualJointState.size === 0) {
+                this.syncVirtualStateFromModel();
+            }
+            this.ensureFakeControllerVirtualJoints();
         }
 
         this.isRunning = true;
-        this.statusMessage = mode === 'sim' ? 'Simulation running' : 'Live view running';
+        this.statusMessage = this.getRunningStatusMessage(mode);
         this.refreshTopicBindings();
 
         if (mode === 'sim') {
@@ -278,6 +451,16 @@ export class JointStateStreamController {
 
         this.emitChange();
         return true;
+    }
+
+    getRunningStatusMessage(mode) {
+        if (mode === 'sim') {
+            return this.getActiveSimBackend() === SIM_BACKENDS.FAKE_FORWARD_POSITION_CONTROLLER
+                ? 'Fake Forward Position Controller running'
+                : 'Target JointState simulation running';
+        }
+
+        return 'Live view running';
     }
 
     pause() {
@@ -300,23 +483,49 @@ export class JointStateStreamController {
             return;
         }
 
-        const topic = this.currentMode === 'sim'
-            ? this.configs.sim.targetJointTopic
-            : this.configs.live.liveJointTopic;
-
         try {
+            if (this.currentMode === 'sim') {
+                this.refreshSimTopicBindings();
+                return;
+            }
+
             this.rosClient.subscribeJointState(
-                topic,
+                this.configs.live.liveJointTopic,
                 message => this.handleJointStateMessage(message),
-                INPUT_SUBSCRIPTION_KEY
+                TARGET_SUBSCRIPTION_KEY
             );
         } catch (error) {
             this.statusMessage = error.message;
         }
     }
 
+    refreshSimTopicBindings() {
+        if (this.getActiveSimBackend() === SIM_BACKENDS.TARGET_JOINT_STATE) {
+            this.rosClient.subscribeJointState(
+                this.configs.sim.targetJointTopic,
+                message => this.handleJointStateMessage(message),
+                TARGET_SUBSCRIPTION_KEY
+            );
+            return;
+        }
+
+        this.rosClient.subscribeFloat64MultiArray(
+            this.configs.sim.leftControllerCommandTopic,
+            message => this.handleForwardPositionCommand('left', message),
+            LEFT_COMMAND_SUBSCRIPTION_KEY
+        );
+
+        this.rosClient.subscribeFloat64MultiArray(
+            this.configs.sim.rightControllerCommandTopic,
+            message => this.handleForwardPositionCommand('right', message),
+            RIGHT_COMMAND_SUBSCRIPTION_KEY
+        );
+    }
+
     clearTopicBindings() {
-        this.rosClient.unsubscribeJointState(INPUT_SUBSCRIPTION_KEY);
+        this.rosClient.unsubscribeTopic(TARGET_SUBSCRIPTION_KEY);
+        this.rosClient.unsubscribeTopic(LEFT_COMMAND_SUBSCRIPTION_KEY);
+        this.rosClient.unsubscribeTopic(RIGHT_COMMAND_SUBSCRIPTION_KEY);
     }
 
     startPublishTimer() {
@@ -343,7 +552,7 @@ export class JointStateStreamController {
         const count = Math.min(names.length, positions.length);
         const mappedPose = {};
         const missingJoints = [];
-        const mappingConfig = this.mappingConfigs[this.currentMode] || DEFAULT_JOINT_STATE_MAPPING_CONFIG;
+        const mappingConfig = this.getMappingConfig(this.currentMode);
 
         for (let index = 0; index < count; index += 1) {
             const resolved = resolveJointStateMapping(mappingConfig, names[index], positions[index]);
@@ -367,9 +576,65 @@ export class JointStateStreamController {
 
         if (Object.keys(mappedPose).length > 0) {
             this.applyJointValues(mappedPose);
+            this.publishCurrentState();
         }
 
         this.emitChange();
+    }
+
+    handleForwardPositionCommand(side, message) {
+        const data = Array.isArray(message?.data) ? message.data : [];
+        const mappedPose = {};
+        const missingJoints = [];
+
+        for (let index = 0; index < 7; index += 1) {
+            const value = Number(data[index]);
+            if (!Number.isFinite(value)) {
+                continue;
+            }
+
+            const urdfJoint = this.getFakeCommandUrdfJointName(side, index);
+            const joint = this.currentModel?.joints?.get(urdfJoint);
+            if (!joint || joint.type === 'fixed') {
+                missingJoints.push(urdfJoint || getDefaultUrdfJointName(side, index));
+                continue;
+            }
+
+            mappedPose[urdfJoint] = value;
+            this.virtualJointState.set(urdfJoint, value);
+        }
+
+        this.recordMessageStats(Object.keys(mappedPose).length, missingJoints);
+
+        if (Object.keys(mappedPose).length > 0) {
+            this.applyJointValues(mappedPose);
+            this.publishCurrentState();
+        }
+
+        this.emitChange();
+    }
+
+    getFakeCommandUrdfJointName(side, index) {
+        const rosJoint = getDefaultRosJointName(side, index);
+        const entry = this.getFakeControllerMappingEntries().find(item => item.rosJoint === rosJoint);
+        return entry?.urdfJoint || getDefaultUrdfJointName(side, index);
+    }
+
+    getFakeControllerMappingEntries() {
+        const config = normalizeJointStateMappingConfig(
+            this.mappingConfigs.sim[SIM_BACKENDS.FAKE_FORWARD_POSITION_CONTROLLER] || DEFAULT_OPENARMX_JOINT_STATE_MAPPING_CONFIG
+        );
+
+        const rawEntries = Object.entries(config.mappings)
+            .map(([sourceJoint, mappingValue]) => parseMappingValue(sourceJoint, mappingValue))
+            .filter(entry => entry?.rosJoint && entry?.urdfJoint);
+
+        if (rawEntries.length > 0) {
+            return rawEntries;
+        }
+
+        return Object.entries(DEFAULT_OPENARMX_JOINT_STATE_MAPPING_CONFIG.mappings)
+            .map(([sourceJoint, urdfJoint]) => parseMappingValue(sourceJoint, urdfJoint));
     }
 
     recordMessageStats(mappedJointCount, missingJoints) {
@@ -413,6 +678,7 @@ export class JointStateStreamController {
         }
 
         this.virtualJointState = new Map(this.initialJointState);
+        this.ensureFakeControllerVirtualJoints();
         this.applyJointValues(Object.fromEntries(this.virtualJointState.entries()));
         this.publishCurrentState();
         this.statusMessage = 'Reset to URDF initial pose';
@@ -420,13 +686,7 @@ export class JointStateStreamController {
         return true;
     }
 
-    buildJointStateMessage() {
-        const names = Array.from(this.virtualJointState.keys());
-        const positions = names.map(name => {
-            const value = Number(this.virtualJointState.get(name));
-            return Number.isFinite(value) ? value : 0;
-        });
-
+    buildJointStateMessage(names, positions) {
         return {
             header: {
                 stamp: getRosTimeNow(),
@@ -439,12 +699,55 @@ export class JointStateStreamController {
         };
     }
 
+    buildVirtualJointStateMessage() {
+        const names = Array.from(this.virtualJointState.keys());
+        const positions = names.map(name => this.getVirtualJointValue(name));
+        return this.buildJointStateMessage(names, positions);
+    }
+
+    buildFakeControllerJointStateMessage() {
+        const entries = this.getFakeControllerMappingEntries();
+        const names = entries.map(entry => entry.rosJoint);
+        const positions = entries.map(entry => this.mapUrdfValueToRosValue(entry, this.getVirtualJointValue(entry.urdfJoint)));
+        return this.buildJointStateMessage(names, positions);
+    }
+
+    buildFakeControllerDebugJointStateMessage() {
+        const entries = this.getFakeControllerMappingEntries();
+        const names = entries.map(entry => entry.urdfJoint);
+        const positions = entries.map(entry => this.getVirtualJointValue(entry.urdfJoint));
+        return this.buildJointStateMessage(names, positions);
+    }
+
+    getVirtualJointValue(urdfJoint) {
+        const value = Number(this.virtualJointState.get(urdfJoint));
+        return Number.isFinite(value) ? value : 0;
+    }
+
+    mapUrdfValueToRosValue(entry, urdfValue) {
+        const scale = Math.abs(entry.scale) > Number.EPSILON ? entry.scale : 1;
+        return entry.sign * ((urdfValue - entry.offset) / scale);
+    }
+
     publishCurrentState() {
         if (this.currentMode !== 'sim' || this.virtualJointState.size === 0) {
             return false;
         }
 
-        const message = this.buildJointStateMessage();
+        if (this.getActiveSimBackend() === SIM_BACKENDS.FAKE_FORWARD_POSITION_CONTROLLER) {
+            const jointStatesMessage = this.buildFakeControllerJointStateMessage();
+            const simDebugMessage = this.buildFakeControllerDebugJointStateMessage();
+            const jointStatesPublished = this.rosClient.publishJointState(this.configs.sim.jointStatesTopic, jointStatesMessage);
+            const simDebugPublished = this.rosClient.publishJointState(this.configs.sim.simJointTopic, simDebugMessage);
+
+            if (jointStatesPublished || simDebugPublished) {
+                this.stats.lastPublishedAt = Date.now();
+            }
+
+            return jointStatesPublished || simDebugPublished;
+        }
+
+        const message = this.buildVirtualJointStateMessage();
         const simPublished = this.rosClient.publishJointState(this.configs.sim.simJointTopic, message);
         const currentPublished = this.rosClient.publishJointState(this.configs.sim.currentJointTopic, message);
 
@@ -465,6 +768,7 @@ export class JointStateStreamController {
         const lastMessageAgeMs = this.stats.lastMessageAt === null
             ? null
             : Date.now() - this.stats.lastMessageAt;
+        const simBackend = this.getActiveSimBackend();
 
         return {
             mode,
@@ -473,7 +777,8 @@ export class JointStateStreamController {
             statusMessage: this.statusMessage,
             connection,
             config: this.getConfig(mode),
-            mappingConfig: cloneJointStateMappingConfig(this.mappingConfigs[mode] || DEFAULT_JOINT_STATE_MAPPING_CONFIG),
+            simBackend,
+            mappingConfig: cloneJointStateMappingConfig(this.getMappingConfig(mode)),
             hasModel: !!this.currentModel,
             modelName: this.currentFileName || this.currentModel?.name || 'Loaded model',
             movableJointCount: movableJoints.length,
@@ -483,7 +788,11 @@ export class JointStateStreamController {
             mappedJointCount: this.stats.mappedJointCount,
             missingJointCount: this.stats.missingJointCount,
             missingJoints: [...this.stats.missingJoints],
-            lastPublishedAt: this.stats.lastPublishedAt
+            lastPublishedAt: this.stats.lastPublishedAt,
+            fakeControllerJointNames: {
+                ros: this.getFakeControllerMappingEntries().map(entry => entry.rosJoint),
+                urdf: this.getFakeControllerMappingEntries().map(entry => entry.urdfJoint)
+            }
         };
     }
 }

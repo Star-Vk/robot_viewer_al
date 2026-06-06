@@ -1,6 +1,7 @@
 import { Ros, Topic } from 'roslib';
 
 const JOINT_STATE_TYPE = 'sensor_msgs/JointState';
+const FLOAT64_MULTI_ARRAY_TYPE = 'std_msgs/Float64MultiArray';
 
 function formatError(error) {
     if (!error) {
@@ -149,29 +150,45 @@ export class RosbridgeClient {
         }
     }
 
-    subscribeJointState(topicName, callback, key = topicName) {
+    subscribeTopic(topicName, messageType, callback, key = topicName, label = 'topic') {
         const normalizedTopic = String(topicName || '').trim();
         if (!normalizedTopic) {
-            throw new Error('JointState topic is required');
+            throw new Error(`${label} is required`);
         }
         if (!this.ros?.isConnected) {
             throw new Error('ROS bridge is not connected');
         }
 
-        this.unsubscribeJointState(key);
+        this.unsubscribeTopic(key);
 
         const topic = new Topic({
             ros: this.ros,
             name: normalizedTopic,
-            messageType: JOINT_STATE_TYPE
+            messageType
         });
 
         topic.subscribe(callback);
-        this.subscriptions.set(key, { topic, callback, topicName: normalizedTopic });
-        return () => this.unsubscribeJointState(key);
+        this.subscriptions.set(key, { topic, callback, topicName: normalizedTopic, messageType });
+        return () => this.unsubscribeTopic(key);
+    }
+
+    subscribeJointState(topicName, callback, key = topicName) {
+        return this.subscribeTopic(topicName, JOINT_STATE_TYPE, callback, key, 'JointState topic');
+    }
+
+    subscribeFloat64MultiArray(topicName, callback, key = topicName) {
+        return this.subscribeTopic(topicName, FLOAT64_MULTI_ARRAY_TYPE, callback, key, 'Float64MultiArray topic');
     }
 
     unsubscribeJointState(key) {
+        this.unsubscribeTopic(key);
+    }
+
+    unsubscribeFloat64MultiArray(key) {
+        this.unsubscribeTopic(key);
+    }
+
+    unsubscribeTopic(key) {
         const subscription = this.subscriptions.get(key);
         if (!subscription) {
             return;
@@ -182,7 +199,7 @@ export class RosbridgeClient {
     }
 
     unsubscribeAll() {
-        Array.from(this.subscriptions.keys()).forEach(key => this.unsubscribeJointState(key));
+        Array.from(this.subscriptions.keys()).forEach(key => this.unsubscribeTopic(key));
     }
 
     publishJointState(topicName, jointState) {

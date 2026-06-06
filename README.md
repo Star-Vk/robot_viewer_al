@@ -21,7 +21,7 @@
 - MuJoCo 支持：对 MJCF 模型做仿真
 - 动作库播放：导入 CSV，选中动作后在模型上回放
 - 动作映射配置：支持导入自定义映射 JSON，并可随时恢复默认规则
-- OpenArm Sim 模式：订阅目标 `JointState`，驱动 URDF，并发布虚拟当前关节状态
+- OpenArm Sim 模式：支持 `Target JointState` 和 `Fake Forward Position Controller` 两种后端
 - OpenArm Live 模式：订阅真实反馈 `JointState`，只做 URDF 可视化同步
 
 ## 运行方式
@@ -62,7 +62,7 @@ Mode: Viewer | Sim | Live
 
 1. 一个可加载的 URDF / Xacro / robot model，最好连同 meshes 目录一起加载。
 2. 一个 rosbridge WebSocket，默认地址是 `ws://localhost:9090`。
-3. 一个 `sensor_msgs/msg/JointState` 输入 topic。
+3. 一个输入 topic：`JointState` 或左右臂 `Float64MultiArray` controller command。
 4. 如果 topic 里的 joint name 和 URDF joint name 不一致，需要提供 joint mapping。
 
 ### Viewer
@@ -72,6 +72,114 @@ Mode: Viewer | Sim | Live
 ### Sim
 
 `Sim` 是遥操仿真验证模式。切换到 `Sim` 后，原 Viewer 面板入口会隐藏，只显示 `Sim Panel`。
+
+Sim Panel 里有两个 backend：
+
+```text
+Backend: Fake Forward Position Controller / Target JointState
+```
+
+默认 backend 是 `Fake Forward Position Controller`。它用于模拟真实 `ros2_control` 后端，推荐用于 OpenArmX IK 联调。
+
+`Target JointState` 保留为手动调试入口，方便直接向 Viewer 发目标关节状态。
+
+### Sim Backend: Fake Forward Position Controller
+
+推荐链路：
+
+```text
+Pico / WebXR
+    ↓
+openarmx_unitree_xr_bridge
+    ↓
+/pico_* pose/grip/trigger
+    ↓
+openarmx_teleop_vr_node
+    ↑
+/joint_states                <- robot_viewer_al Sim Fake Controller publishes this
+    ↓
+/left_forward_position_controller/commands
+/right_forward_position_controller/commands
+    ↓
+robot_viewer_al Sim Fake Controller
+    ↓
+URDF model
+```
+
+默认配置：
+
+```text
+ROS Bridge URL: ws://localhost:9090
+Joint States Publish Topic: /joint_states
+Left Controller Command Topic: /left_forward_position_controller/commands
+Right Controller Command Topic: /right_forward_position_controller/commands
+Sim Debug JointState Topic: /openarm/sim/joint_states
+Publish Rate: 30Hz
+```
+
+发布：
+
+```text
+/joint_states
+/openarm/sim/joint_states
+```
+
+订阅：
+
+```text
+/left_forward_position_controller/commands
+/right_forward_position_controller/commands
+```
+
+`/joint_states` 默认发布给 IK 的 joint name：
+
+```text
+openarmx_left_joint1
+openarmx_left_joint2
+openarmx_left_joint3
+openarmx_left_joint4
+openarmx_left_joint5
+openarmx_left_joint6
+openarmx_left_joint7
+openarmx_right_joint1
+openarmx_right_joint2
+openarmx_right_joint3
+openarmx_right_joint4
+openarmx_right_joint5
+openarmx_right_joint6
+openarmx_right_joint7
+```
+
+`/openarm/sim/joint_states` 默认发布 URDF joint name：
+
+```text
+openarm_left_joint1
+openarm_left_joint2
+openarm_left_joint3
+openarm_left_joint4
+openarm_left_joint5
+openarm_left_joint6
+openarm_left_joint7
+openarm_right_joint1
+openarm_right_joint2
+openarm_right_joint3
+openarm_right_joint4
+openarm_right_joint5
+openarm_right_joint6
+openarm_right_joint7
+```
+
+左右臂 command 数据含义：
+
+```text
+left data[0..6]  -> openarm_left_joint1..7
+right data[0..6] -> openarm_right_joint1..7
+data[7]          -> gripper，第一版忽略
+```
+
+### Sim Backend: Target JointState
+
+这个 backend 保留原来的手动调试能力。
 
 默认配置：
 
@@ -88,9 +196,10 @@ Current JointState Topic for IK: /openarm/current_joint_states
 2. 进入 `Sim` 模式。
 3. 在 `Sim Panel` 中连接 rosbridge。
 4. 点击 `Start Simulation`。
-5. Viewer 从当前模型可动关节生成虚拟 current joint state。
-6. Viewer 订阅 `/openarm/target_joint_states`，收到目标关节后驱动 URDF。
-7. Viewer 持续发布 `/openarm/sim/joint_states` 和 `/openarm/current_joint_states`。
+5. 选择 `Target JointState` backend。
+6. Viewer 从当前模型可动关节生成虚拟 current joint state。
+7. Viewer 订阅 `/openarm/target_joint_states`，收到目标关节后驱动 URDF。
+8. Viewer 持续发布 `/openarm/sim/joint_states` 和 `/openarm/current_joint_states`。
 
 第一版 `sim_joint_states` 与 `current_joint_states` 内容相同，都是当前 URDF 虚拟关节状态。
 
@@ -98,10 +207,11 @@ Current JointState Topic for IK: /openarm/current_joint_states
 
 1. 切到 `Viewer`，加载 URDF 或模型目录。
 2. 切到 `Sim`。
-3. ROS 侧启动 rosbridge。
-4. 网页点击 `Connect`。
-5. 网页点击 `Start Simulation`。
-6. 向 `/openarm/target_joint_states` 发布测试 `JointState`。
+3. 选择 backend。
+4. ROS 侧启动 rosbridge。
+5. 网页点击 `Connect`。
+6. 网页点击 `Start Simulation`。
+7. 根据 backend 发布 `JointState` 或左右臂 controller command。
 
 ### Live
 
@@ -123,6 +233,8 @@ Live JointState Topic: /openarm/live/joint_states
 5. Viewer 订阅真实反馈 `JointState`，按 mapping 驱动 URDF。
 
 `Live` 模式不会发布虚拟 current joint states，也不会发送任何机械臂控制命令。
+
+IK 节点不需要因为 Sim / Live 改 topic。推荐设计是：Sim 用 Fake Forward Position Controller 模拟实机后端，Live 只看真实反馈。
 
 最短验证路径：
 
@@ -154,6 +266,7 @@ ros2 launch rosbridge_server rosbridge_websocket_launch.xml
 
 ```text
 sensor_msgs/JointState
+std_msgs/Float64MultiArray
 ```
 
 消息字段：
@@ -208,9 +321,54 @@ urdf_value = sign * source_value * scale + offset
 
 如果没有提供 mapping，则默认使用 `source_joint_name == urdf_joint_name`。
 
+Fake Forward Position Controller 的默认 mapping 是：
+
+```json
+{
+  "mappings": {
+    "openarmx_left_joint1": "openarm_left_joint1",
+    "openarmx_left_joint2": "openarm_left_joint2",
+    "openarmx_left_joint3": "openarm_left_joint3",
+    "openarmx_left_joint4": "openarm_left_joint4",
+    "openarmx_left_joint5": "openarm_left_joint5",
+    "openarmx_left_joint6": "openarm_left_joint6",
+    "openarmx_left_joint7": "openarm_left_joint7",
+    "openarmx_right_joint1": "openarm_right_joint1",
+    "openarmx_right_joint2": "openarm_right_joint2",
+    "openarmx_right_joint3": "openarm_right_joint3",
+    "openarmx_right_joint4": "openarm_right_joint4",
+    "openarmx_right_joint5": "openarm_right_joint5",
+    "openarmx_right_joint6": "openarm_right_joint6",
+    "openarmx_right_joint7": "openarm_right_joint7"
+  }
+}
+```
+
 ### ROS2 测试命令
 
-把 `joint1` 替换成当前 URDF 中真实存在的可动关节名：
+Fake Forward Position Controller backend 下，先确认 `/joint_states` 有输出：
+
+```bash
+ros2 topic echo /joint_states
+```
+
+手动测试左臂 command：
+
+```bash
+ros2 topic pub /left_forward_position_controller/commands std_msgs/msg/Float64MultiArray "{
+  data: [0.3, -0.2, 0.4, 0.1, 0.0, 0.0, 0.0, 0.0]
+}"
+```
+
+手动测试右臂 command：
+
+```bash
+ros2 topic pub /right_forward_position_controller/commands std_msgs/msg/Float64MultiArray "{
+  data: [0.3, -0.2, 0.4, 0.1, 0.0, 0.0, 0.0, 0.0]
+}"
+```
+
+Target JointState backend 下，把 `joint1` 替换成当前 URDF 中真实存在的可动关节名：
 
 ```bash
 ros2 topic pub /openarm/target_joint_states sensor_msgs/msg/JointState "{
@@ -238,9 +396,9 @@ ros2 topic pub /openarm/live/joint_states sensor_msgs/msg/JointState "{
 
 - `Load a URDF/model first`：还没有加载模型，先回到 `Viewer` 模式加载 URDF 或模型目录。
 - `Connection: error`：前端没有连上 rosbridge。确认 ROS 侧已启动 rosbridge，URL 是否应该是 `ws://localhost:9090` 或 `ws://<ROS机器IP>:9090`。
-- `Mapped Joint Count = 0`：收到消息了，但没有任何 JointState name 成功映射到当前模型关节。
+- `Mapped Joint Count = 0`：收到消息或 command 了，但没有任何关节成功映射到当前模型关节。
 - `Missing Joint Count > 0`：mapping 后的 URDF joint name 不存在，检查 mapping 或 URDF 关节名。
-- 模型不动但连接正常：优先确认 `name[]` 和 `position[]` 长度一致、position 单位是 rad、topic 是否发到了当前面板配置的输入 topic。
+- 模型不动但连接正常：Target backend 优先确认 `name[]` 和 `position[]` 长度一致；Fake backend 优先确认 `Float64MultiArray.data` 至少包含 7 个关节值。所有 position 单位都是 rad。
 
 ## 基本使用流程
 

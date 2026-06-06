@@ -1,4 +1,4 @@
-import { DEFAULT_SIM_STREAM_CONFIG } from '../../stream/JointStateStreamController.js';
+import { DEFAULT_SIM_STREAM_CONFIG, SIM_BACKENDS } from '../../stream/JointStateStreamController.js';
 
 function formatAge(ageMs) {
     if (ageMs === null || ageMs === undefined) {
@@ -17,6 +17,12 @@ function setValueIfIdle(input, value) {
         return;
     }
     input.value = value;
+}
+
+function setSectionVisible(section, visible) {
+    if (section) {
+        section.style.display = visible ? 'flex' : 'none';
+    }
 }
 
 export class SimPanel {
@@ -42,11 +48,21 @@ export class SimPanel {
     render() {
         this.container.innerHTML = `
             <div class="stream-panel">
-                <div class="stream-safety">Arm Output: <strong>DISABLED</strong></div>
+                <div id="sim-safety-line" class="stream-safety">Arm Output: <strong>DISABLED</strong> · Hardware CAN: <strong>DISABLED</strong></div>
 
                 <div class="stream-section">
                     <div class="stream-section-title">Current URDF / Model</div>
                     <div id="sim-model-status" class="stream-status-line"></div>
+                </div>
+
+                <div class="stream-section">
+                    <label class="stream-field">
+                        <span>Backend</span>
+                        <select id="sim-backend-select" class="stream-input">
+                            <option value="${SIM_BACKENDS.FAKE_FORWARD_POSITION_CONTROLLER}">Fake Forward Position Controller</option>
+                            <option value="${SIM_BACKENDS.TARGET_JOINT_STATE}">Target JointState</option>
+                        </select>
+                    </label>
                 </div>
 
                 <div class="stream-section">
@@ -60,7 +76,7 @@ export class SimPanel {
                     </div>
                 </div>
 
-                <div class="stream-section">
+                <div id="sim-target-config-section" class="stream-section">
                     <label class="stream-field">
                         <span>Target JointState Topic</span>
                         <input id="sim-target-topic" class="stream-input" value="${DEFAULT_SIM_STREAM_CONFIG.targetJointTopic}">
@@ -73,8 +89,30 @@ export class SimPanel {
                         <span>Current JointState Topic for IK</span>
                         <input id="sim-current-topic" class="stream-input" value="${DEFAULT_SIM_STREAM_CONFIG.currentJointTopic}">
                     </label>
+                </div>
+
+                <div id="sim-fake-config-section" class="stream-section">
                     <label class="stream-field">
-                        <span>Simulation Hz</span>
+                        <span>Joint States Publish Topic</span>
+                        <input id="sim-joint-states-topic" class="stream-input" value="${DEFAULT_SIM_STREAM_CONFIG.jointStatesTopic}">
+                    </label>
+                    <label class="stream-field">
+                        <span>Left Controller Command Topic</span>
+                        <input id="sim-left-command-topic" class="stream-input" value="${DEFAULT_SIM_STREAM_CONFIG.leftControllerCommandTopic}">
+                    </label>
+                    <label class="stream-field">
+                        <span>Right Controller Command Topic</span>
+                        <input id="sim-right-command-topic" class="stream-input" value="${DEFAULT_SIM_STREAM_CONFIG.rightControllerCommandTopic}">
+                    </label>
+                    <label class="stream-field">
+                        <span>Sim Debug JointState Topic</span>
+                        <input id="sim-debug-topic" class="stream-input" value="${DEFAULT_SIM_STREAM_CONFIG.simJointTopic}">
+                    </label>
+                </div>
+
+                <div class="stream-section">
+                    <label class="stream-field">
+                        <span>Publish Rate</span>
                         <input id="sim-hz" class="stream-input" type="number" min="1" max="120" step="1" value="${DEFAULT_SIM_STREAM_CONFIG.simulationHz}">
                     </label>
                 </div>
@@ -100,8 +138,8 @@ export class SimPanel {
                     <div class="stream-section-title">Status</div>
                     <div class="stream-metrics">
                         <div><span>Connection</span><strong id="sim-connection-status">-</strong></div>
-                        <div><span>Last Message Age</span><strong id="sim-last-age">-</strong></div>
-                        <div><span>Message Hz</span><strong id="sim-message-hz">0.0</strong></div>
+                        <div><span id="sim-last-age-label">Last Command Age</span><strong id="sim-last-age">-</strong></div>
+                        <div><span id="sim-message-hz-label">Command Hz</span><strong id="sim-message-hz">0.0</strong></div>
                         <div><span>Mapped Joint Count</span><strong id="sim-mapped-count">0</strong></div>
                         <div><span>Missing Joint Count</span><strong id="sim-missing-count">0</strong></div>
                     </div>
@@ -161,31 +199,57 @@ export class SimPanel {
 
         this.container.querySelector('#sim-reset-mapping-btn')?.addEventListener('click', () => {
             this.controller.resetMapping('sim');
-            const mappingText = this.container.querySelector('#sim-mapping-text');
-            if (mappingText) {
-                mappingText.value = this.controller.getMappingText('sim');
-            }
+            this.refreshMappingText();
             this.setStatusMessage('Mapping reset');
             this.update();
         });
 
-        ['sim-ros-url', 'sim-target-topic', 'sim-publish-topic', 'sim-current-topic', 'sim-hz'].forEach(id => {
+        this.container.querySelector('#sim-backend-select')?.addEventListener('change', () => {
+            this.syncConfig();
+            this.refreshMappingText();
+            this.update();
+        });
+
+        [
+            'sim-ros-url',
+            'sim-target-topic',
+            'sim-publish-topic',
+            'sim-current-topic',
+            'sim-joint-states-topic',
+            'sim-left-command-topic',
+            'sim-right-command-topic',
+            'sim-debug-topic',
+            'sim-hz'
+        ].forEach(id => {
             this.container.querySelector(`#${id}`)?.addEventListener('change', () => this.syncConfig());
         });
     }
 
     getConfig() {
         return {
+            backend: this.container.querySelector('#sim-backend-select')?.value || DEFAULT_SIM_STREAM_CONFIG.backend,
             rosbridgeUrl: this.container.querySelector('#sim-ros-url')?.value || DEFAULT_SIM_STREAM_CONFIG.rosbridgeUrl,
             targetJointTopic: this.container.querySelector('#sim-target-topic')?.value || DEFAULT_SIM_STREAM_CONFIG.targetJointTopic,
-            simJointTopic: this.container.querySelector('#sim-publish-topic')?.value || DEFAULT_SIM_STREAM_CONFIG.simJointTopic,
+            simJointTopic: this.container.querySelector('#sim-debug-topic')?.value
+                || this.container.querySelector('#sim-publish-topic')?.value
+                || DEFAULT_SIM_STREAM_CONFIG.simJointTopic,
             currentJointTopic: this.container.querySelector('#sim-current-topic')?.value || DEFAULT_SIM_STREAM_CONFIG.currentJointTopic,
+            jointStatesTopic: this.container.querySelector('#sim-joint-states-topic')?.value || DEFAULT_SIM_STREAM_CONFIG.jointStatesTopic,
+            leftControllerCommandTopic: this.container.querySelector('#sim-left-command-topic')?.value || DEFAULT_SIM_STREAM_CONFIG.leftControllerCommandTopic,
+            rightControllerCommandTopic: this.container.querySelector('#sim-right-command-topic')?.value || DEFAULT_SIM_STREAM_CONFIG.rightControllerCommandTopic,
             simulationHz: this.container.querySelector('#sim-hz')?.value || DEFAULT_SIM_STREAM_CONFIG.simulationHz
         };
     }
 
     syncConfig() {
         this.controller.updateConfig('sim', this.getConfig());
+    }
+
+    refreshMappingText() {
+        const mappingText = this.container.querySelector('#sim-mapping-text');
+        if (mappingText) {
+            mappingText.value = this.controller.getMappingText('sim');
+        }
     }
 
     setStatusMessage(message) {
@@ -202,12 +266,28 @@ export class SimPanel {
 
         const status = this.controller.getStatus('sim');
         const config = status.config;
+        const isFakeBackend = config.backend === SIM_BACKENDS.FAKE_FORWARD_POSITION_CONTROLLER;
 
+        setValueIfIdle(this.container.querySelector('#sim-backend-select'), config.backend);
         setValueIfIdle(this.container.querySelector('#sim-ros-url'), config.rosbridgeUrl);
         setValueIfIdle(this.container.querySelector('#sim-target-topic'), config.targetJointTopic);
         setValueIfIdle(this.container.querySelector('#sim-publish-topic'), config.simJointTopic);
         setValueIfIdle(this.container.querySelector('#sim-current-topic'), config.currentJointTopic);
+        setValueIfIdle(this.container.querySelector('#sim-joint-states-topic'), config.jointStatesTopic);
+        setValueIfIdle(this.container.querySelector('#sim-left-command-topic'), config.leftControllerCommandTopic);
+        setValueIfIdle(this.container.querySelector('#sim-right-command-topic'), config.rightControllerCommandTopic);
+        setValueIfIdle(this.container.querySelector('#sim-debug-topic'), config.simJointTopic);
         setValueIfIdle(this.container.querySelector('#sim-hz'), config.simulationHz);
+
+        setSectionVisible(this.container.querySelector('#sim-target-config-section'), !isFakeBackend);
+        setSectionVisible(this.container.querySelector('#sim-fake-config-section'), isFakeBackend);
+
+        const safetyLine = this.container.querySelector('#sim-safety-line');
+        if (safetyLine) {
+            safetyLine.innerHTML = isFakeBackend
+                ? 'Arm Output: <strong>DISABLED</strong> · Fake Controller: <strong>ENABLED</strong> · Hardware CAN: <strong>DISABLED</strong>'
+                : 'Arm Output: <strong>DISABLED</strong> · Hardware CAN: <strong>DISABLED</strong>';
+        }
 
         const modelStatus = this.container.querySelector('#sim-model-status');
         if (modelStatus) {
@@ -221,6 +301,8 @@ export class SimPanel {
             connectionStatus.textContent = status.connection.status;
         }
 
+        this.container.querySelector('#sim-last-age-label').textContent = isFakeBackend ? 'Last Command Age' : 'Last Message Age';
+        this.container.querySelector('#sim-message-hz-label').textContent = isFakeBackend ? 'Command Hz' : 'Message Hz';
         this.container.querySelector('#sim-last-age').textContent = formatAge(status.lastMessageAgeMs);
         this.container.querySelector('#sim-message-hz').textContent = status.messageHz.toFixed(1);
         this.container.querySelector('#sim-mapped-count').textContent = String(status.mappedJointCount);
