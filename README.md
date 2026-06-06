@@ -7,6 +7,7 @@
 - 导入 CSV 动作库
 - 按时间轴播放动作
 - 用可配置的映射文件把 `can_iface + motor_id` 映射到 URDF 关节
+- OpenArm 遥操链路可视化验证：`Viewer` / `Sim` / `Live` 三种模式
 
 原项目入口请见：
 - https://github.com/fan-ziqi/robot_viewer
@@ -20,21 +21,182 @@
 - MuJoCo 支持：对 MJCF 模型做仿真
 - 动作库播放：导入 CSV，选中动作后在模型上回放
 - 动作映射配置：支持导入自定义映射 JSON，并可随时恢复默认规则
+- OpenArm Sim 模式：订阅目标 `JointState`，驱动 URDF，并发布虚拟当前关节状态
+- OpenArm Live 模式：订阅真实反馈 `JointState`，只做 URDF 可视化同步
+
+## OpenArm 模式系统
+
+顶部工具栏提供模式切换入口：
+
+```text
+Mode: Viewer | Sim | Live
+```
+
+### Viewer
+
+`Viewer` 是原有模型查看模式，保留文件面板、关节面板、动作库、结构树、代码编辑器等原有功能。
+
+### Sim
+
+`Sim` 是遥操仿真验证模式。切换到 `Sim` 后，原 Viewer 面板入口会隐藏，只显示 `Sim Panel`。
+
+默认配置：
+
+```text
+ROS Bridge URL: ws://localhost:9090
+Target JointState Topic: /openarm/target_joint_states
+Sim Current JointState Publish Topic: /openarm/sim/joint_states
+Current JointState Topic for IK: /openarm/current_joint_states
+```
+
+运行逻辑：
+
+1. 先加载 URDF / robot model。
+2. 进入 `Sim` 模式。
+3. 在 `Sim Panel` 中连接 rosbridge。
+4. 点击 `Start Simulation`。
+5. Viewer 从当前模型可动关节生成虚拟 current joint state。
+6. Viewer 订阅 `/openarm/target_joint_states`，收到目标关节后驱动 URDF。
+7. Viewer 持续发布 `/openarm/sim/joint_states` 和 `/openarm/current_joint_states`。
+
+第一版 `sim_joint_states` 与 `current_joint_states` 内容相同，都是当前 URDF 虚拟关节状态。
+
+### Live
+
+`Live` 是真实反馈可视化模式。切换到 `Live` 后，原 Viewer 面板入口会隐藏，只显示 `Live Panel`。
+
+默认配置：
+
+```text
+ROS Bridge URL: ws://localhost:9090
+Live JointState Topic: /openarm/live/joint_states
+```
+
+运行逻辑：
+
+1. 先加载 URDF / robot model。
+2. 进入 `Live` 模式。
+3. 在 `Live Panel` 中连接 rosbridge。
+4. 点击 `Start Live View`。
+5. Viewer 订阅真实反馈 `JointState`，按 mapping 驱动 URDF。
+
+`Live` 模式不会发布虚拟 current joint states，也不会发送任何机械臂控制命令。
+
+### 安全边界
+
+当前项目只做可视化和仿真状态发布：
+
+- 不发送电机控制命令
+- 不连接 CAN
+- 不调用 OpenArm 电机 SDK
+- UI 固定显示 `Arm Output: DISABLED`
+
+## rosbridge 与 JointState
+
+浏览器端通过 `roslibjs` 连接 rosbridge。ROS 侧需要先启动 rosbridge websocket，例如：
+
+```bash
+ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+```
+
+前端使用标准 roslib 类型字符串：
+
+```text
+sensor_msgs/JointState
+```
+
+消息字段：
+
+```text
+name[]      URDF 关节名
+position[]  当前关节角，单位 rad
+velocity[]  可为空
+effort[]    可为空
+```
+
+### Joint Mapping
+
+Sim / Live 面板的 mapping 支持两种写法。
+
+字符串写法：
+
+```json
+{
+  "name": "openarm-stream-default",
+  "version": 1,
+  "source": "joint_state",
+  "mappings": {
+    "source_joint_name": "urdf_joint_name"
+  }
+}
+```
+
+对象写法：
+
+```json
+{
+  "name": "openarm-stream-default",
+  "version": 1,
+  "source": "joint_state",
+  "mappings": {
+    "source_joint_name": {
+      "urdf_joint": "urdf_joint_name",
+      "scale": 1.0,
+      "offset": 0.0,
+      "sign": 1
+    }
+  }
+}
+```
+
+映射公式：
+
+```text
+urdf_value = sign * source_value * scale + offset
+```
+
+如果没有提供 mapping，则默认使用 `source_joint_name == urdf_joint_name`。
+
+### ROS2 测试命令
+
+把 `joint1` 替换成当前 URDF 中真实存在的可动关节名：
+
+```bash
+ros2 topic pub /openarm/target_joint_states sensor_msgs/msg/JointState "{
+  header: {stamp: {sec: 0, nanosec: 0}, frame_id: ''},
+  name: ['joint1'],
+  position: [0.5],
+  velocity: [],
+  effort: []
+}"
+```
+
+验证 Live 模式时，把 topic 改成：
+
+```bash
+ros2 topic pub /openarm/live/joint_states sensor_msgs/msg/JointState "{
+  header: {stamp: {sec: 0, nanosec: 0}, frame_id: ''},
+  name: ['joint1'],
+  position: [0.5],
+  velocity: [],
+  effort: []
+}"
+```
 
 ## 运行方式
 
-推荐直接使用 `npm`：
+项目声明的包管理器是 `pnpm@9.0.0`：
 
 ```bash
-cd /home/starvk/workspace/qyz1/robot_viewer_al
-npm install
-npm run dev
+cd /home/starvk/workspace/nodejs_ws/robot_viewer_al
+pnpm install
+pnpm run dev
 ```
 
 构建生产版本：
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 构建产物会输出到 `dist/`。

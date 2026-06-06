@@ -18,6 +18,11 @@ import { MujocoSimulationManager } from './renderer/MujocoSimulationManager.js';
 import { ActionPlaybackController } from './controllers/ActionPlaybackController.js';
 import { ActionPanel } from './ui/ActionPanel.js';
 import { i18n } from './utils/i18n.js';
+import { ModeManager } from './modes/ModeManager.js';
+import { RosbridgeClient } from './ros/RosbridgeClient.js';
+import { JointStateStreamController } from './stream/JointStateStreamController.js';
+import { SimPanel } from './ui/panels/SimPanel.js';
+import { LivePanel } from './ui/panels/LivePanel.js';
 
 // Expose d3 globally for PanelManager
 window.d3 = d3;
@@ -41,6 +46,11 @@ class App {
         this.mujocoSimulationManager = null;
         this.actionPlaybackController = null;
         this.actionPanel = null;
+        this.modeManager = null;
+        this.rosbridgeClient = null;
+        this.jointStateStreamController = null;
+        this.simPanel = null;
+        this.livePanel = null;
         this.currentModel = null;
         this.currentMJCFFile = null;
         this.currentMJCFModel = null;
@@ -320,6 +330,9 @@ class App {
             // Update editor button visibility
             this.updateEditorButtonVisibility();
 
+            // Initialize OpenArm Viewer / Sim / Live mode system
+            this.setupOpenArmModes();
+
             // Start render loop
             this.animate();
 
@@ -335,6 +348,46 @@ class App {
         const openEditorBtn = document.getElementById('open-editor-btn');
         if (openEditorBtn) {
             openEditorBtn.classList.add('visible');
+        }
+    }
+
+    /**
+     * Setup OpenArm visualization modes and JointState stream panels
+     */
+    setupOpenArmModes() {
+        this.modeManager = new ModeManager();
+        this.rosbridgeClient = new RosbridgeClient();
+        this.jointStateStreamController = new JointStateStreamController({
+            sceneManager: this.sceneManager,
+            jointControlsUI: this.jointControlsUI,
+            rosClient: this.rosbridgeClient
+        });
+
+        this.simPanel = new SimPanel(this.jointStateStreamController);
+        this.simPanel.init();
+
+        this.livePanel = new LivePanel(this.jointStateStreamController);
+        this.livePanel.init();
+
+        this.modeManager.onModeChanged = (mode, previousMode) => {
+            this.handleModeChanged(mode, previousMode);
+        };
+        this.modeManager.init();
+        this.jointStateStreamController.setMode(this.modeManager.getMode());
+
+        if (this.currentModel) {
+            this.jointStateStreamController.setModel(this.currentModel, this.fileHandler?.currentModelFile);
+        }
+    }
+
+    /**
+     * Handle Viewer / Sim / Live mode changes
+     */
+    handleModeChanged(mode) {
+        this.jointStateStreamController?.setMode(mode);
+
+        if (mode !== 'viewer' && this.actionPlaybackController?.isPlaying) {
+            this.actionPlaybackController.pause(true);
         }
     }
 
@@ -422,7 +475,9 @@ class App {
             }
 
             this.currentModel = model;
+            this.jointStateStreamController?.setModel(model, file);
             this.updateModelInfo(model, file);
+            this.modeManager?.applyModeVisibility();
 
             // Hide snapshot if exists
             const snapshot = document.getElementById('canvas-snapshot');
@@ -460,6 +515,7 @@ class App {
         }
 
         this.currentModel = model;
+        this.jointStateStreamController?.setModel(model, file);
 
         // Force render current state first (important!)
         this.sceneManager.redraw();
@@ -635,6 +691,7 @@ class App {
 
         // Update model info
         this.updateModelInfo(model, file);
+        this.modeManager?.applyModeVisibility();
     }
 
     /**

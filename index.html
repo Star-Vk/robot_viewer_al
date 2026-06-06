@@ -260,6 +260,158 @@
             overflow: hidden;
         }
 
+        #floating-sim-panel,
+        #floating-live-panel {
+            top: 80px;
+            right: 20px;
+            width: 410px;
+            height: calc(100vh - 100px);
+            transition: all 0.4s var(--spring);
+            display: none;
+            flex-direction: column;
+        }
+
+        #floating-sim-panel.maximized,
+        #floating-live-panel.maximized {
+            top: 80px !important;
+            left: 20px !important;
+            right: auto !important;
+            width: calc(100vw - 40px) !important;
+            height: calc(100vh - 100px) !important;
+        }
+
+        .stream-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .stream-safety {
+            padding: 9px 10px;
+            border: 1px solid rgba(255, 184, 107, 0.35);
+            border-radius: 10px;
+            color: #ffb86b;
+            background: rgba(255, 184, 107, 0.08);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .stream-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 10px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        [data-theme="light"] .stream-section {
+            background: rgba(0, 0, 0, 0.02);
+            border-color: rgba(0, 0, 0, 0.08);
+        }
+
+        .stream-section-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+        }
+
+        .stream-field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            min-width: 0;
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .stream-input,
+        .stream-textarea {
+            width: 100%;
+            min-width: 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-primary);
+            font-size: 12px;
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+            padding: 8px 10px;
+        }
+
+        [data-theme="light"] .stream-input,
+        [data-theme="light"] .stream-textarea {
+            background: rgba(0, 0, 0, 0.03);
+            border-color: rgba(0, 0, 0, 0.08);
+        }
+
+        .stream-input:focus,
+        .stream-textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.15);
+        }
+
+        .stream-textarea {
+            min-height: 150px;
+            resize: vertical;
+            line-height: 1.45;
+        }
+
+        .stream-button-row {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .stream-full-button {
+            width: 100%;
+        }
+
+        .stream-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .stream-metrics div {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 8px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.04);
+            min-width: 0;
+        }
+
+        [data-theme="light"] .stream-metrics div {
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        .stream-metrics span {
+            color: var(--text-tertiary);
+            font-size: 10px;
+            line-height: 1.2;
+        }
+
+        .stream-metrics strong {
+            color: var(--text-primary);
+            font-size: 13px;
+            font-variant-numeric: tabular-nums;
+            overflow-wrap: anywhere;
+        }
+
+        .stream-status-line {
+            color: var(--text-secondary);
+            font-size: 12px;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }
+
         .action-panel-content > * {
             flex-shrink: 0;
         }
@@ -438,6 +590,21 @@
         .control-bar-select:focus {
             outline: none;
             background-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .mode-control {
+            gap: 8px;
+        }
+
+        .mode-label {
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        #mode-select {
+            min-width: 86px;
         }
 
         .tool-button {
@@ -3183,6 +3350,17 @@
     <div id="container">
         <div id="canvas-container">
             <div id="top-control-bar">
+                <div class="control-bar-section mode-control">
+                    <span class="mode-label">Mode</span>
+                    <select id="mode-select" class="control-bar-select">
+                        <option value="viewer">Viewer</option>
+                        <option value="sim">Sim</option>
+                        <option value="live">Live</option>
+                    </select>
+                </div>
+
+                <div class="control-bar-divider"></div>
+
                 <div class="control-bar-section">
                     <button class="control-button active" id="show-visual" data-checked="true">
                         <span data-i18n="visual"></span>
@@ -3225,7 +3403,7 @@
 
                 <div class="control-bar-divider"></div>
 
-                <div class="control-bar-section">
+                <div class="control-bar-section" id="viewer-panel-toolbar">
                     <button class="tool-button active" id="toggle-files-panel">
                         <span class="tool-button-text" data-i18n="files"></span>
                     </button>
@@ -3240,6 +3418,18 @@
                     </button>
                     <button class="tool-button" id="open-editor-btn">
                         <span class="tool-button-text" data-i18n="edit"></span>
+                    </button>
+                </div>
+
+                <div class="control-bar-section" id="sim-panel-toolbar" style="display: none;">
+                    <button class="tool-button active" id="toggle-sim-panel">
+                        <span class="tool-button-text">Sim Panel</span>
+                    </button>
+                </div>
+
+                <div class="control-bar-section" id="live-panel-toolbar" style="display: none;">
+                    <button class="tool-button active" id="toggle-live-panel">
+                        <span class="tool-button-text">Live Panel</span>
                     </button>
                 </div>
 
@@ -3377,6 +3567,24 @@
                         <div id="action-status" class="action-status"></div>
                     </div>
                 </div>
+            </div>
+
+            <div id="floating-sim-panel" class="floating-panel">
+                <div class="floating-panel-header">
+                    <span>Sim Panel</span>
+                    <button class="panel-maximize-btn" data-panel-id="floating-sim-panel">⛶</button>
+                    <button class="panel-close-btn" data-panel="floating-sim-panel">✕</button>
+                </div>
+                <div class="floating-panel-content" id="sim-panel-content"></div>
+            </div>
+
+            <div id="floating-live-panel" class="floating-panel">
+                <div class="floating-panel-header">
+                    <span>Live Panel</span>
+                    <button class="panel-maximize-btn" data-panel-id="floating-live-panel">⛶</button>
+                    <button class="panel-close-btn" data-panel="floating-live-panel">✕</button>
+                </div>
+                <div class="floating-panel-content" id="live-panel-content"></div>
             </div>
 
             <div id="floating-model-tree" class="floating-panel">
