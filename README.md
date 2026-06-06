@@ -24,6 +24,30 @@
 - OpenArm Sim 模式：订阅目标 `JointState`，驱动 URDF，并发布虚拟当前关节状态
 - OpenArm Live 模式：订阅真实反馈 `JointState`，只做 URDF 可视化同步
 
+## 运行方式
+
+项目声明的包管理器是 `pnpm@9.0.0`：
+
+```bash
+cd robot_viewer_al
+pnpm install
+pnpm run dev
+```
+
+启动后打开页面：
+
+```text
+http://127.0.0.1:3000/
+```
+
+构建生产版本：
+
+```bash
+pnpm run build
+```
+
+构建产物会输出到 `dist/`。
+
 ## OpenArm 模式系统
 
 顶部工具栏提供模式切换入口：
@@ -31,6 +55,15 @@
 ```text
 Mode: Viewer | Sim | Live
 ```
+
+### 你需要准备什么
+
+使用 `Sim` / `Live` 前，需要准备：
+
+1. 一个可加载的 URDF / Xacro / robot model，最好连同 meshes 目录一起加载。
+2. 一个 rosbridge WebSocket，默认地址是 `ws://localhost:9090`。
+3. 一个 `sensor_msgs/msg/JointState` 输入 topic。
+4. 如果 topic 里的 joint name 和 URDF joint name 不一致，需要提供 joint mapping。
 
 ### Viewer
 
@@ -61,6 +94,15 @@ Current JointState Topic for IK: /openarm/current_joint_states
 
 第一版 `sim_joint_states` 与 `current_joint_states` 内容相同，都是当前 URDF 虚拟关节状态。
 
+最短验证路径：
+
+1. 切到 `Viewer`，加载 URDF 或模型目录。
+2. 切到 `Sim`。
+3. ROS 侧启动 rosbridge。
+4. 网页点击 `Connect`。
+5. 网页点击 `Start Simulation`。
+6. 向 `/openarm/target_joint_states` 发布测试 `JointState`。
+
 ### Live
 
 `Live` 是真实反馈可视化模式。切换到 `Live` 后，原 Viewer 面板入口会隐藏，只显示 `Live Panel`。
@@ -81,6 +123,15 @@ Live JointState Topic: /openarm/live/joint_states
 5. Viewer 订阅真实反馈 `JointState`，按 mapping 驱动 URDF。
 
 `Live` 模式不会发布虚拟 current joint states，也不会发送任何机械臂控制命令。
+
+最短验证路径：
+
+1. 切到 `Viewer`，加载 URDF 或模型目录。
+2. 切到 `Live`。
+3. ROS 侧启动 rosbridge。
+4. 网页点击 `Connect`。
+5. 网页点击 `Start Live View`。
+6. 向 `/openarm/live/joint_states` 发布测试或真实反馈 `JointState`。
 
 ### 安全边界
 
@@ -183,23 +234,13 @@ ros2 topic pub /openarm/live/joint_states sensor_msgs/msg/JointState "{
 }"
 ```
 
-## 运行方式
+### 常见状态说明
 
-项目声明的包管理器是 `pnpm@9.0.0`：
-
-```bash
-cd /home/starvk/workspace/nodejs_ws/robot_viewer_al
-pnpm install
-pnpm run dev
-```
-
-构建生产版本：
-
-```bash
-pnpm run build
-```
-
-构建产物会输出到 `dist/`。
+- `Load a URDF/model first`：还没有加载模型，先回到 `Viewer` 模式加载 URDF 或模型目录。
+- `Connection: error`：前端没有连上 rosbridge。确认 ROS 侧已启动 rosbridge，URL 是否应该是 `ws://localhost:9090` 或 `ws://<ROS机器IP>:9090`。
+- `Mapped Joint Count = 0`：收到消息了，但没有任何 JointState name 成功映射到当前模型关节。
+- `Missing Joint Count > 0`：mapping 后的 URDF joint name 不存在，检查 mapping 或 URDF 关节名。
+- 模型不动但连接正常：优先确认 `name[]` 和 `position[]` 长度一致、position 单位是 rad、topic 是否发到了当前面板配置的输入 topic。
 
 ## 基本使用流程
 
