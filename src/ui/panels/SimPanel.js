@@ -314,9 +314,17 @@ export class SimPanel {
         }
 
         const statusMessage = this.container.querySelector('#sim-status-message');
-        if (statusMessage && status.statusMessage) {
+        if (statusMessage) {
             const missing = status.missingJoints.length > 0 ? ` | missing: ${status.missingJoints.join(', ')}` : '';
-            statusMessage.textContent = `${status.statusMessage}${missing}`;
+            const waitingForInput = status.running && status.connection.connected && status.lastMessageAgeMs === null;
+
+            if (waitingForInput && isFakeBackend) {
+                statusMessage.textContent = `ROS topic connected; waiting for Float64MultiArray command messages on ${config.leftControllerCommandTopic} / ${config.rightControllerCommandTopic}`;
+            } else if (waitingForInput) {
+                statusMessage.textContent = `ROS topic connected; waiting for JointState messages on ${config.targetJointTopic}`;
+            } else if (status.statusMessage) {
+                statusMessage.textContent = `${status.statusMessage}${missing}`;
+            }
         }
     }
 }
