@@ -149,10 +149,14 @@ function parseMappingValue(sourceJoint, mappingValue) {
     }
 
     if (mappingValue && typeof mappingValue === 'object') {
+        const sign = Number.isFinite(Number(mappingValue.sign))
+            ? (Number(mappingValue.sign) >= 0 ? 1 : -1)
+            : 1;
+
         return {
             rosJoint: sourceJoint,
             urdfJoint: mappingValue.urdf_joint,
-            sign: Number(mappingValue.sign) >= 0 ? 1 : -1,
+            sign,
             scale: Number.isFinite(Number(mappingValue.scale)) ? Number(mappingValue.scale) : 1,
             offset: Number.isFinite(Number(mappingValue.offset)) ? Number(mappingValue.offset) : 0
         };
@@ -588,12 +592,13 @@ export class JointStateStreamController {
         const missingJoints = [];
 
         for (let index = 0; index < 7; index += 1) {
-            const value = Number(data[index]);
-            if (!Number.isFinite(value)) {
+            const rawValue = Number(data[index]);
+            if (!Number.isFinite(rawValue)) {
                 continue;
             }
 
-            const urdfJoint = this.getFakeCommandUrdfJointName(side, index);
+            const resolved = this.resolveFakeCommandMapping(side, index, rawValue);
+            const { urdfJoint, value } = resolved;
             const joint = this.currentModel?.joints?.get(urdfJoint);
             if (!joint || joint.type === 'fixed') {
                 missingJoints.push(urdfJoint || getDefaultUrdfJointName(side, index));
@@ -612,6 +617,32 @@ export class JointStateStreamController {
         }
 
         this.emitChange();
+    }
+
+    resolveFakeCommandMapping(side, index, rawValue) {
+        const rosJoint = getDefaultRosJointName(side, index);
+        const fallbackUrdfJoint = getDefaultUrdfJointName(side, index);
+        const entry = this.getFakeControllerMappingEntries().find(item => item.rosJoint === rosJoint);
+
+        if (!entry) {
+            return {
+                rosJoint,
+                urdfJoint: fallbackUrdfJoint,
+                value: rawValue
+            };
+        }
+
+        const sign = Number.isFinite(Number(entry.sign))
+            ? (Number(entry.sign) >= 0 ? 1 : -1)
+            : 1;
+        const scale = Number.isFinite(Number(entry.scale)) ? Number(entry.scale) : 1;
+        const offset = Number.isFinite(Number(entry.offset)) ? Number(entry.offset) : 0;
+
+        return {
+            rosJoint,
+            urdfJoint: entry.urdfJoint || fallbackUrdfJoint,
+            value: sign * rawValue * scale + offset
+        };
     }
 
     getFakeCommandUrdfJointName(side, index) {
